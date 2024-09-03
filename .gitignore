@@ -1,0 +1,67 @@
+# Python-related
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.pyo
+*.pyd
+*.pdb
+
+# Virtual environment
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Distribution/Packaging
+*.egg
+*.egg-info
+dist/
+build/
+*.egg-info/
+*.tgz
+*.zip
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Environment variables file
+.env
+
+# SQLite database files
+*.sqlite3
+
+# Logs
+*.log
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Test and coverage reports
+.coverage
+*.cover
+*.coverage.*
+nosetests.xml
+coverage.xml
+*.hypothesis/
+.pytest_cache/
+
+# Secrets
+secrets.json
+config.yml
+
+# Migrations
+migrations/
+
+# Others
+*.swp
+*.swo
