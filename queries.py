@@ -1,7 +1,6 @@
 from mysql.connector import Error;
 
 def create_tables(connection):
-    """Create tables in the database."""
     try:
         cursor = connection.cursor()
         
@@ -71,16 +70,6 @@ def create_tables(connection):
         )
         """)
 
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS logs (
-            log_id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT,
-            action VARCHAR(255),
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(user_id)
-        )
-        """)
-
         # Commit changes
         connection.commit()
         print("Tables created successfully.")
@@ -92,7 +81,6 @@ def create_tables(connection):
         cursor.close()
 
 def check_table_empty(connection, table_name):
-    """Check if the table is empty."""
     try:
         cursor = connection.cursor()
         cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
@@ -104,9 +92,7 @@ def check_table_empty(connection, table_name):
     finally:
         cursor.close()
 
-
 def seed_data(connection):
-    """Insert initial data into the tables if they are empty."""
     try:
         cursor = connection.cursor()
 
@@ -184,22 +170,191 @@ def seed_data(connection):
             """, users)
             print("Data seeded into 'users' table.")
 
-        # Seed data for `logs` table
-        if check_table_empty(connection, 'logs'):
-            logs = [
-                (1, 'Created initial tables and seeded data'),
-                (2, 'Added new resident John Doe')
-            ]
-            cursor.executemany("""
-                INSERT INTO logs (user_id, action)
-                VALUES (%s, %s)
-            """, logs)
-            print("Data seeded into 'logs' table.")
-
         # Commit changes
         connection.commit()
 
     except Error as e:
         print(f"Error: {e}")
+    finally:
+        cursor.close()
+
+def get_residents(connection, flat_id=None, tower_id=None):
+    try:
+        cursor = connection.cursor()
+        
+        if flat_id is not None:
+            query = "SELECT f.flat_number,r.first_name, r.last_name, r.date_of_birth, r.phone_number, f.flat_type  FROM residents r LEFT JOIN flats f ON r.flat_id = f.flat_id WHERE r.flat_id = %s"
+            params = (flat_id,)
+        elif tower_id is not None:
+            query = "SELECT f.flat_number,r.first_name, r.last_name, r.date_of_birth, r.phone_number, f.flat_type  FROM residents r LEFT JOIN flats f ON r.flat_id = f.flat_id WHERE f.tower_id = %s"
+            params = (tower_id,)
+        else:
+            query = "SELECT f.flat_number,r.first_name, r.last_name, r.date_of_birth, r.phone_number, f.flat_type  FROM residents r LEFT JOIN flats f ON r.flat_id = f.flat_id"
+            params = ()
+        
+        cursor.execute(query, params)
+        residents = cursor.fetchall()
+        return residents
+    except Error as e:
+        print(f"Error: {e}")
+        return None
+    finally:
+        cursor.close()
+
+def get_flats(connection,tower_id=None):
+    try:
+        cursor = connection.cursor()
+        if tower_id is None:
+            cursor.execute("SELECT * FROM flats")
+        else:
+            query = "SELECT * FROM flats WHERE tower_id = %s"
+            cursor.execute(query, (tower_id,))
+
+        flats = cursor.fetchall()
+        return flats
+    except Error as e:
+        print(f"Error: {e}")
+        return None
+    finally:
+        cursor.close()
+
+def get_parkings(connection, allotted=None):
+    try:
+        cursor = connection.cursor()
+        if allotted is not None:
+            if allotted:
+                query = "SELECT * FROM parkings WHERE flat_id IS NOT NULL"
+            else:
+                query = "SELECT * FROM parkings WHERE flat_id IS NULL"
+            params = ()
+        else:
+            query = "SELECT * FROM parkings"
+            params = ()
+        cursor.execute(query, params)
+        parkings = cursor.fetchall()
+        return parkings
+    except Error as e:
+        print(f"Error: {e}")
+        return None
+    finally:
+        cursor.close()
+
+def get_combined_charges(connection,flat_id=None):
+    try:
+        cursor = connection.cursor()
+        if flat_id is not None:
+            query = """
+                SELECT SUM(amount) as total_charges
+                FROM combined_charges
+                WHERE flat_id = %s AND payment_status = 'Unpaid'
+            """
+            params = (flat_id,)
+        else:
+            query = """
+                SELECT flat_id
+                FROM combined_charges
+                WHERE payment_status = 'Unpaid'
+                GROUP BY flat_id
+            """
+            params = ()
+        
+        cursor.execute(query, params)
+        result = cursor.fetchall()
+        
+        if flat_id is not None:
+            if result:
+                return result[0][0] 
+            return 0 
+        else:
+            return [row[0] for row in result]
+    
+    except Error as e:
+        print(f"Error: {e}")
+        return None
+    finally:
+        cursor.close()
+
+def add_resident(connection, flat_id, first_name, last_name, date_of_birth, phone_number, email):
+    try:
+        cursor = connection.cursor()
+        query = """
+            INSERT INTO residents (flat_id, first_name, last_name, date_of_birth, phone_number, email)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        params = (flat_id, first_name, last_name, date_of_birth, phone_number, email)
+        cursor.execute(query, params)
+        connection.commit()
+        return True
+    except Error as e:
+        print(f"Error: {e}")
+        return False
+    finally:
+        cursor.close()
+
+def add_parking(connection, flat_id, parking_spot_number, allocation_date):
+    try:
+        cursor = connection.cursor()
+        query = """
+            INSERT INTO parkings (flat_id, parking_spot_number, allocation_date)
+            VALUES (%s, %s, %s)
+        """
+        params = (flat_id, parking_spot_number, allocation_date)
+        cursor.execute(query, params)
+        connection.commit()
+        return True
+    except Error as e:
+        print(f"Error: {e}")
+        return False
+    finally:
+        cursor.close()
+
+def add_combined_charge(connection, flat_id, charge_month, charge_type, amount, payment_status, due_date, payment_date):
+    try:
+        cursor = connection.cursor()
+        query = """
+            INSERT INTO combined_charges (flat_id, charge_month, charge_type, amount, payment_status, due_date, payment_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+        params = (flat_id, charge_month, charge_type, amount, payment_status, due_date, payment_date)
+        cursor.execute(query, params)
+        connection.commit()
+        return True
+    except Error as e:
+        print(f"Error: {e}")
+        return False
+    finally:
+        cursor.close()
+    
+def add_flat(connection, flat_number, tower_id, floor_number, flat_type):
+    try:
+        cursor = connection.cursor()
+        query = """
+            INSERT INTO flats (flat_number, tower_id, floor_number, flat_type)
+            VALUES (%s, %s, %s, %s)
+        """
+        params = (flat_number, tower_id, floor_number, flat_type)
+        cursor.execute(query, params)
+        connection.commit()
+        return True
+    except Error as e:
+        print(f"Error: {e}")
+        return False
+    finally:
+        cursor.close()
+    
+def add_tower(connection, tower_name, address):
+    try:
+        cursor = connection.cursor()
+        query = """
+            INSERT INTO towers (tower_name, address)
+            VALUES (%s, %s)
+        """
+        params = (tower_name, address)
+        cursor.execute(query, params)
+        connection.commit()
+        return True
+    except Error as e:
+        print(f"Error: {e}")
+        return False
     finally:
         cursor.close()
